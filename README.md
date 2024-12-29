@@ -1,4 +1,4 @@
- **complete guide** for setting up a TypeScript project with Express:
+ **Complete guide** for setting up a TypeScript project with Express:
 
 ---
 
@@ -228,5 +228,4 @@ npm start
    Use `jest` and `supertest` for unit and integration tests.
 
 ---
-
-This guide provides a full setup for an Express project with TypeScript, including environment configuration, routing, middleware, and scripts for development and production.
+video: https://youtu.be/zRo2tvQpus8 
