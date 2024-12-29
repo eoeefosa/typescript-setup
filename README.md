@@ -229,3 +229,5 @@ npm start
 
 ---
 video: https://youtu.be/zRo2tvQpus8 
+Article: https://www.typescripttutorial.net/typescript-express/setup-express-with-typescript/
+
