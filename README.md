@@ -1,4 +1,4 @@
-Here’s a **complete guide** for setting up a TypeScript project with Express:
+ **complete guide** for setting up a TypeScript project with Express:
 
 ---
 
