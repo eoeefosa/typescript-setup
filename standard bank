@@ -1,0 +1,360 @@
+Below is an outline of typical API endpoints and features you’d expect in a full-fledged banking application (e.g. similar to Access Bank). It covers user management, accounts, transactions, loans, cards, bill payments, support, and admin operations. Use it as a reference to define your REST API routes and payload schemas.
+
+---
+
+## 1. User & Authentication
+
+### **POST** `/api/auth/register`
+- **Purpose**: Create a new user account.  
+- **Request Body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "P@ssw0rd!",
+    "fullname": "John Doe",
+    "phoneNumber": "+1234567890"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "User registered successfully",
+    "userId": "..."
+  }
+  ```
+
+### **POST** `/api/auth/login`
+- **Purpose**: Authenticate user and issue JWT.  
+- **Request Body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "P@ssw0rd!"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "token": "eyJhbGciOiJIUzI1NiIsInR..."
+  }
+  ```
+
+### **POST** `/api/auth/logout`
+- **Purpose**: Invalidate current user session (optional, depending on token strategy).  
+
+### **POST** `/api/auth/refresh`
+- **Purpose**: Refresh JWT token before expiry.  
+- **Request Body**:
+  ```json
+  {
+    "refreshToken": "..."
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "token": "new_access_token"
+  }
+  ```
+
+### **POST** `/api/auth/forgot-password`
+- **Purpose**: Send a reset link or OTP to user's email/phone.  
+
+### **POST** `/api/auth/reset-password`
+- **Purpose**: Reset user password using token/OTP.  
+
+### **GET** `/api/users/{userId}`
+- **Purpose**: Fetch a user’s profile.  
+
+### **PUT** `/api/users/{userId}`
+- **Purpose**: Update user profile details (e.g., fullname, phone number, address).  
+
+---
+
+## 2. Account Management
+
+### **POST** `/api/accounts`
+- **Purpose**: Create a new bank account for a user (Savings, Current, etc.).  
+- **Request Body**:
+  ```json
+  {
+    "userId": "12345",
+    "accountType": "SAVINGS",
+    "initialDeposit": 1000
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "Account created",
+    "accountId": "..."
+  }
+  ```
+
+### **GET** `/api/accounts`
+- **Purpose**: List all accounts for the authenticated user (or all accounts if admin).  
+
+### **GET** `/api/accounts/{accountId}`
+- **Purpose**: Get account details and balance.  
+
+### **PUT** `/api/accounts/{accountId}`
+- **Purpose**: Update specific account info (e.g., rename, change status).  
+
+### **PATCH** `/api/accounts/{accountId}/freeze`
+- **Purpose**: Freeze/lock an account to prevent transactions.  
+
+### **PATCH** `/api/accounts/{accountId}/unfreeze`
+- **Purpose**: Unfreeze an account to allow transactions again.  
+
+---
+
+## 3. Transactions
+
+### **POST** `/api/transactions/deposit`
+- **Purpose**: Deposit money into an account.  
+- **Request Body**:
+  ```json
+  {
+    "accountId": "abc123",
+    "amount": 5000
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "Deposit successful",
+    "transactionId": "...",
+    "newBalance": 15000
+  }
+  ```
+
+### **POST** `/api/transactions/withdraw`
+- **Purpose**: Withdraw money from an account.  
+- **Request Body**:
+  ```json
+  {
+    "accountId": "abc123",
+    "amount": 3000
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "Withdrawal successful",
+    "transactionId": "...",
+    "newBalance": 12000
+  }
+  ```
+
+### **POST** `/api/transactions/transfer`
+- **Purpose**: Transfer funds between two accounts (internal or external).  
+- **Request Body**:
+  ```json
+  {
+    "fromAccountId": "abc123",
+    "toAccountId": "xyz789",
+    "amount": 2000
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "Transfer successful",
+    "transactionId": "...",
+    "remainingBalance": 10000
+  }
+  ```
+
+### **GET** `/api/transactions`
+- **Purpose**: Retrieve transaction history (filter by accountId, date range, etc.).  
+
+### **GET** `/api/transactions/{transactionId}`
+- **Purpose**: Get details of a specific transaction.  
+
+---
+
+## 4. Loan Management
+
+### **POST** `/api/loans`
+- **Purpose**: Apply for a new loan.  
+- **Request Body**:
+  ```json
+  {
+    "userId": "12345",
+    "loanType": "PERSONAL",
+    "amount": 10000,
+    "tenureMonths": 12
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "Loan application created",
+    "loanId": "..."
+  }
+  ```
+
+### **GET** `/api/loans`
+- **Purpose**: View loans for the authenticated user (or all loans if admin).  
+
+### **GET** `/api/loans/{loanId}`
+- **Purpose**: View detailed loan info (amount, interest rate, repayment schedule).  
+
+### **POST** `/api/loans/{loanId}/repay`
+- **Purpose**: Make a repayment towards a specific loan.  
+- **Request Body**:
+  ```json
+  {
+    "paymentAmount": 1000
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "Loan repayment successful",
+    "remainingBalance": 9000
+  }
+  ```
+
+---
+
+## 5. Card Management
+
+### **POST** `/api/cards/request`
+- **Purpose**: Request a new debit/credit card.  
+- **Request Body**:
+  ```json
+  {
+    "userId": "12345",
+    "cardType": "DEBIT",
+    "accountId": "abc123"
+  }
+  ```
+
+### **GET** `/api/cards`
+- **Purpose**: Fetch all cards for a user (or all if admin).  
+
+### **GET** `/api/cards/{cardId}`
+- **Purpose**: Fetch details of a specific card.  
+
+### **PATCH** `/api/cards/{cardId}/activate`
+- **Purpose**: Activate a card for usage (e.g., after receipt).  
+
+### **PATCH** `/api/cards/{cardId}/deactivate`
+- **Purpose**: Temporarily disable a card (e.g., if lost).  
+
+### **DELETE** `/api/cards/{cardId}`
+- **Purpose**: Permanently close or cancel a card.  
+
+---
+
+## 6. Bill Payments & Utility Services
+
+### **GET** `/api/bills`
+- **Purpose**: Fetch list of supported billers or upcoming bills.  
+
+### **POST** `/api/bills/pay`
+- **Purpose**: Pay a bill (e.g., electricity, water, mobile recharge).  
+- **Request Body**:
+  ```json
+  {
+    "accountId": "abc123",
+    "billerId": "electricity",
+    "amount": 100
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "Bill payment successful",
+    "transactionId": "..."
+  }
+  ```
+
+### **GET** `/api/bills/history`
+- **Purpose**: Get payment history for user’s bills.  
+
+---
+
+## 7. Customer Support
+
+### **GET** `/api/support/tickets`
+- **Purpose**: View the user’s support tickets (or all tickets if admin).  
+
+### **POST** `/api/support/tickets`
+- **Purpose**: Create a new support ticket.  
+- **Request Body**:
+  ```json
+  {
+    "subject": "Card not working",
+    "description": "My debit card is declined repeatedly..."
+  }
+  ```
+
+### **GET** `/api/support/tickets/{ticketId}`
+- **Purpose**: View a specific ticket’s details and status.  
+
+### **POST** `/api/support/tickets/{ticketId}/respond`
+- **Purpose**: Post a comment or response to an existing ticket (user or admin).  
+
+---
+
+## 8. Admin & Back-Office
+
+> Typically secured by admin roles/permissions.
+
+### **GET** `/api/admin/users`
+- **Purpose**: List all users, possibly with filters.  
+
+### **GET** `/api/admin/users/{userId}`
+- **Purpose**: View detailed user info.  
+
+### **PUT** `/api/admin/users/{userId}/status`
+- **Purpose**: Enable/disable user account or lock out suspicious accounts.  
+
+### **GET** `/api/admin/loans`
+- **Purpose**: View all loan applications; approve or reject them.  
+
+### **GET** `/api/admin/transactions`
+- **Purpose**: View all transactions; run transaction audits.  
+
+### **GET** `/api/admin/reports`
+- **Purpose**: Generate reports (daily transactions, new accounts, etc.).  
+
+---
+
+## 9. Notifications (Optional Enhancement)
+
+### **GET** `/api/notifications`
+- **Purpose**: Retrieve notifications (transaction alerts, system messages).  
+
+### **PATCH** `/api/notifications/{id}/read`
+- **Purpose**: Mark a notification as read.  
+
+---
+
+## 10. Typical Request & Response Metadata
+
+- **Authentication**:  
+  - Usually via JWT in `Authorization: Bearer <token>`.
+  - Admin routes require admin roles in the token claims.
+
+- **Pagination & Filtering**:  
+  - Common in listing endpoints (`/api/accounts`, `/api/transactions`, `/api/admin/users`) with query params: 
+    - `?page=1&limit=20&sort=createdAt&order=desc`
+
+- **Error Handling**:  
+  ```json
+  {
+    "message": "Error details",
+    "code": 400 (or appropriate HTTP status),
+    "errors": [ "Additional field-wise errors" ]
+  }
+  ```
+
+- **Validation**:  
+  - Validate request body using libraries like `Joi` or `yup`.
+
+---
+
+**Use this as a reference to map out your banking application’s endpoints.** You can refine each endpoint’s request/response fields based on specific business rules (interest rates, currency conversions, KYC requirements, etc.).
