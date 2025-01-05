@@ -1,0 +1,437 @@
+Below is a concise yet reasonably complete boilerplate for an advanced banking backend using **Express**, **TypeScript**, and **MongoDB** (via Mongoose). This example covers typical features like user registration/login, account management, and transaction endpoints.
+
+---
+
+## 1. Project Structure
+
+```
+banking-app-backend
+├── src
+│   ├── config
+│   │   └── database.ts
+│   ├── controllers
+│   │   ├── accountController.ts
+│   │   ├── transactionController.ts
+│   │   └── userController.ts
+│   ├── middlewares
+│   │   └── authMiddleware.ts
+│   ├── models
+│   │   ├── Account.ts
+│   │   ├── Transaction.ts
+│   │   └── User.ts
+│   ├── routes
+│   │   ├── accountRoutes.ts
+│   │   ├── transactionRoutes.ts
+│   │   └── userRoutes.ts
+│   ├── utils
+│   │   └── index.ts
+│   └── server.ts
+├── .env
+├── package.json
+├── tsconfig.json
+└── yarn.lock (or package-lock.json if using npm)
+```
+
+---
+
+## 2. Installation
+
+```bash
+# Initialize project and install dependencies
+npm init -y
+npm install express mongoose bcrypt jsonwebtoken cors dotenv
+npm install --save-dev typescript ts-node-dev @types/express @types/node @types/bcrypt @types/jsonwebtoken @types/cors
+
+# Generate tsconfig
+npx tsc --init
+```
+
+*(Ensure you configure `"outDir": "./dist"` and `"rootDir": "./src"` in `tsconfig.json`.)*
+
+---
+
+## 3. Environment Variables (.env)
+
+```env
+PORT=4000
+MONGO_URI=mongodb://127.0.0.1:27017/banking_app
+JWT_SECRET=supersecretkey
+```
+
+---
+
+## 4. Database Connection (`src/config/database.ts`)
+
+```ts
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI || '', {
+      // recommended connection options
+    });
+    console.log('MongoDB connected');
+  } catch (error) {
+    console.error('Error connecting to MongoDB:', error);
+    process.exit(1);
+  }
+};
+
+export default connectDB;
+```
+
+---
+
+## 5. Models
+
+### `src/models/User.ts`
+```ts
+import { Schema, model, Document } from 'mongoose';
+
+export interface IUser extends Document {
+  email: string;
+  password: string;
+  fullname: string;
+  createdAt: Date;
+}
+
+const userSchema = new Schema<IUser>(
+  {
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    fullname: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+export default model<IUser>('User', userSchema);
+```
+
+### `src/models/Account.ts`
+```ts
+import { Schema, model, Document } from 'mongoose';
+
+export interface IAccount extends Document {
+  userId: string;
+  accountNumber: string;
+  balance: number;
+  createdAt: Date;
+}
+
+const accountSchema = new Schema<IAccount>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    accountNumber: { type: String, required: true, unique: true },
+    balance: { type: Number, default: 0 },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+export default model<IAccount>('Account', accountSchema);
+```
+
+### `src/models/Transaction.ts`
+```ts
+import { Schema, model, Document } from 'mongoose';
+
+export interface ITransaction extends Document {
+  accountId: string;
+  amount: number;
+  type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+  createdAt: Date;
+}
+
+const transactionSchema = new Schema<ITransaction>(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true },
+    amount: { type: Number, required: true },
+    type: { 
+      type: String, 
+      enum: ['DEPOSIT', 'WITHDRAWAL', 'TRANSFER'], 
+      required: true 
+    },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+export default model<ITransaction>('Transaction', transactionSchema);
+```
+
+---
+
+## 6. Controllers
+
+### `src/controllers/userController.ts`
+```ts
+import { Request, Response } from 'express';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import User from '../models/User';
+
+export const registerUser = async (req: Request, res: Response) => {
+  try {
+    const { email, password, fullname } = req.body;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ message: 'User already exists' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await User.create({ email, password: hashedPassword, fullname });
+    return res.status(201).json({ message: 'User created', userId: newUser._id });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error', error });
+  }
+};
+
+export const loginUser = async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ message: 'Invalid Credentials' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ message: 'Invalid Credentials' });
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || '', { expiresIn: '1d' });
+    return res.json({ token });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error', error });
+  }
+};
+```
+
+### `src/controllers/accountController.ts`
+```ts
+import { Request, Response } from 'express';
+import Account from '../models/Account';
+
+export const createAccount = async (req: Request, res: Response) => {
+  try {
+    const { accountNumber } = req.body;
+    const userId = req.body.userId; // or from req.user if using JWT
+    const existingAcc = await Account.findOne({ accountNumber });
+    if (existingAcc) return res.status(400).json({ message: 'Account number already exists' });
+
+    const newAccount = await Account.create({ userId, accountNumber, balance: 0 });
+    return res.status(201).json({ message: 'Account created', accountId: newAccount._id });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error', error });
+  }
+};
+
+export const getUserAccounts = async (req: Request, res: Response) => {
+  try {
+    const userId = req.body.userId; // or from JWT
+    const accounts = await Account.find({ userId });
+    return res.json(accounts);
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error', error });
+  }
+};
+```
+
+### `src/controllers/transactionController.ts`
+```ts
+import { Request, Response } from 'express';
+import Account from '../models/Account';
+import Transaction from '../models/Transaction';
+
+export const makeTransaction = async (req: Request, res: Response) => {
+  try {
+    const { accountId, amount, type } = req.body;
+    const account = await Account.findById(accountId);
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+
+    if (type === 'WITHDRAWAL' && account.balance < amount) {
+      return res.status(400).json({ message: 'Insufficient balance' });
+    }
+
+    // Adjust balance
+    if (type === 'DEPOSIT') {
+      account.balance += amount;
+    } else if (type === 'WITHDRAWAL') {
+      account.balance -= amount;
+    } // For 'TRANSFER', you'd handle transferring between two accounts
+
+    await account.save();
+
+    const transaction = await Transaction.create({ accountId, amount, type });
+    return res.status(201).json({ message: 'Transaction successful', transaction });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error', error });
+  }
+};
+
+export const getAccountTransactions = async (req: Request, res: Response) => {
+  try {
+    const { accountId } = req.params;
+    const transactions = await Transaction.find({ accountId }).sort({ createdAt: -1 });
+    return res.json(transactions);
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error', error });
+  }
+};
+```
+
+---
+
+## 7. Middleware
+
+### `src/middlewares/authMiddleware.ts`
+```ts
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+
+export interface IAuthRequest extends Request {
+  user?: any; // can define a custom user type
+}
+
+export const authMiddleware = (req: IAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Unauthorized' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || '');
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: 'Invalid token' });
+  }
+};
+```
+
+---
+
+## 8. Routes
+
+### `src/routes/userRoutes.ts`
+```ts
+import { Router } from 'express';
+import { registerUser, loginUser } from '../controllers/userController';
+
+const router = Router();
+
+router.post('/register', registerUser);
+router.post('/login', loginUser);
+
+export default router;
+```
+
+### `src/routes/accountRoutes.ts`
+```ts
+import { Router } from 'express';
+import { createAccount, getUserAccounts } from '../controllers/accountController';
+import { authMiddleware } from '../middlewares/authMiddleware';
+
+const router = Router();
+
+router.post('/', authMiddleware, createAccount);
+router.get('/', authMiddleware, getUserAccounts);
+
+export default router;
+```
+
+### `src/routes/transactionRoutes.ts`
+```ts
+import { Router } from 'express';
+import { makeTransaction, getAccountTransactions } from '../controllers/transactionController';
+import { authMiddleware } from '../middlewares/authMiddleware';
+
+const router = Router();
+
+router.post('/', authMiddleware, makeTransaction);
+router.get('/:accountId', authMiddleware, getAccountTransactions);
+
+export default router;
+```
+
+---
+
+## 9. Server Setup (`src/server.ts`)
+
+```ts
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import connectDB from './config/database';
+import userRoutes from './routes/userRoutes';
+import accountRoutes from './routes/accountRoutes';
+import transactionRoutes from './routes/transactionRoutes';
+
+dotenv.config();
+const app = express();
+
+// Middlewares
+app.use(cors());
+app.use(express.json());
+
+// Routes
+app.use('/api/users', userRoutes);
+app.use('/api/accounts', accountRoutes);
+app.use('/api/transactions', transactionRoutes);
+
+// Start server
+const PORT = process.env.PORT || 4000;
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+});
+```
+
+---
+
+## 10. Scripts in `package.json`
+
+```json
+{
+  "name": "banking-app-backend",
+  "version": "1.0.0",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpileOnly src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^6.5.2"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.0",
+    "@types/cors": "^2.8.12",
+    "@types/express": "^4.17.14",
+    "@types/jsonwebtoken": "^8.5.9",
+    "@types/node": "^18.7.14",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^4.8.3"
+  }
+}
+```
+
+---
+
+## 11. Running the App
+
+1. Create a `.env` file with the variables shown above.
+2. Run `npm run dev` (or `yarn dev`) to start the development server.
+3. Access the API endpoints:
+   - `POST /api/users/register`
+   - `POST /api/users/login`
+   - `POST /api/accounts`
+   - `GET /api/accounts`
+   - `POST /api/transactions`
+   - `GET /api/transactions/:accountId`
+
+---
+
+**That’s it!** You now have a basic but **advanced** scaffolding for a banking application backend using **TypeScript**, **Express**, and **MongoDB**. You can expand on this (e.g. adding more transaction types, implementing transfers between accounts, role-based permissions, more robust logging, etc.) as needed.
